@@ -55,6 +55,10 @@
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
+      <AdditionalCompilerOptions>/openmp</AdditionalCompilerOptions>
+      <AdditionalOptions>--threads 0 %(AdditionalOptions)</AdditionalOptions>
+      <Defines>WIN32</Defines>
+      <Runtime>MT</Runtime>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

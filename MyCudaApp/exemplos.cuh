@@ -19,22 +19,6 @@ __global__ void vector_sum(int* a, int* b, int* c, int n) {
 	}
 }
 
-__global__ void gpu_matrix_mult(int* A, int* B, int* C, int width) {
-	int row = threadIdx.x + blockIdx.x * blockDim.x;
-	int col = threadIdx.y + blockIdx.y * blockDim.y;
-
-	int sum = 0;
-	if (row < width && col < width)
-	{
-		for (int k = 0; k < width; k++)
-		{
-			sum += A[row * width + k] * B[k * width + col];
-		}
-		C[row * width + col] = sum;
-	}
-
-}
-
 void exemplo01() {
 	int a, b, c;
 	int* d_a, * d_b, * d_c;
@@ -216,7 +200,7 @@ void execute_matrix_mult_gpu(int width) {
 	cudaMemcpy(d_A, A, size, cudaMemcpyHostToDevice);
 	cudaMemcpy(d_B, A, size, cudaMemcpyHostToDevice);
 
-	gpu_matrix_mult << <N / THREAD_PER_BLOCK, THREAD_PER_BLOCK >> > (d_A, d_B, d_C, width);
+	//gpu_matrix_mult << <N / THREAD_PER_BLOCK, THREAD_PER_BLOCK >> > (d_A, d_B, d_C, width);
 
 	cudaMemcpy(C, d_C, size, cudaMemcpyDeviceToHost);
 
@@ -230,8 +214,8 @@ void execute_matrix_mult_gpu(int width) {
 	cudaEventElapsedTime(&gpu_elapsed_time_ms, start, stop);
 	printf("Time elapsed on GPU: %f ms.\n\n", gpu_elapsed_time_ms);
 
-
-	//print_matrix(A, width);
+	cudaDeviceSynchronize();
+	print_matrix(C, width);
 
 	cudaFree(d_A);
 	cudaFree(d_B);
@@ -269,4 +253,80 @@ void execute_matrix_mult_cpu(int width) {
 	free(A);
 	free(B);
 	free(C);
+}
+
+
+
+__global__ void gpu_matrix_mult(int* A, int* B, int* C, int N) {
+	int row = threadIdx.y + blockIdx.y * blockDim.y;
+	int col = threadIdx.x + blockIdx.x * blockDim.x;
+
+	if (row < N && col < N)
+	{
+		int sum = 0;
+		for (int i = 0; i < N; i++)
+		{
+			sum += A[row * N + i] * B[i * N + col];
+		}
+		C[row * N + col] = sum;
+	}
+
+}
+
+void init_matrix(int* m, int N) {
+
+	for (int i = 0; i < N * N; ++i)
+	{
+		m[i] = rand() % 10;
+	}
+
+}
+
+void print_matrix(int* m, int width)
+{
+	for (int i = 0; i < width; ++i)
+	{
+		for (int j = 0; j < width; ++j)
+		{
+			printf("%d ", m[i * width + j]);
+		}
+		printf("\n");
+	}
+	printf("\n");
+}
+
+
+void execute_mult_gpu() {
+	int* A, * B, * C;
+	int N = 5000;
+	int threads = 512;
+	int blocks = (N + threads - 1) / threads;
+	const size_t bytes = (N * N) * sizeof(int);
+
+	cudaMallocManaged(&A, bytes);
+	cudaMallocManaged(&B, bytes);
+	cudaMallocManaged(&C, bytes);
+	init_matrix(A, N);
+	init_matrix(B, N);
+
+	dim3 blocksize(threads, threads);
+	dim3 gridsize(blocks, blocks);
+
+	cudaEvent_t start, stop;
+	cudaEventCreate(&start);
+	cudaEventCreate(&stop);
+
+	cudaEventRecord(start, 0);
+
+	gpu_matrix_mult << <gridsize, blocksize >> > (A, B, C, N);
+	cudaDeviceSynchronize();
+
+	cudaEventRecord(stop, 0);
+	cudaEventSynchronize(stop);
+
+	float elapsedtime;
+	cudaEventElapsedTime(&elapsedtime, start, stop);
+	printf("Total GPU Time: %f ms", elapsedtime);
+
+	//print_matrix(C, N);
 }
